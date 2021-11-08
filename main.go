@@ -18,22 +18,45 @@ func main() {
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name:        "url, U",
-			Usage:       "the url to hit (required)",
+			Usage:       "the full url to hit (required if hostname is not set)",
 			Destination: &url,
+		},
+		cli.StringFlag{
+			Name:        "hostname, N",
+			Usage:       "the hostname for the request (required if url is not set)",
+			Destination: &hostname,
+		},
+		cli.IntFlag{
+			Name:        "port, P",
+			Usage:       "the port for the request (optional)",
+			Value:       80,
+			Destination: &port,
+		},
+		cli.StringFlag{
+			Name:        "schema, S",
+			Usage:       "the schema for the request (optional)",
+			Value:       "http",
+			Destination: &schema,
+		},
+		cli.StringFlag{
+			Name:        "endpoint, E",
+			Usage:       "the endpoint for the request (optional)",
+			Value:       "",
+			Destination: &endpoint,
 		},
 		cli.StringSliceFlag{
 			Name:  "headers, H",
-			Usage: "specify a header and value for the request (-H=key:value)",
+			Usage: "specify a header and value for the request (optional, -H=key:value)",
 		},
 		cli.StringFlag{
 			Name:        "verb, V",
-			Usage:       "the HTTP verb to use",
+			Usage:       "the HTTP verb to use (optional)",
 			Value:       "GET",
 			Destination: &httpVerb,
 		},
 		cli.IntFlag{
 			Name:        "code, C",
-			Usage:       "expected response code",
+			Usage:       "expected response code (optional)",
 			Value:       http.StatusOK,
 			Destination: &statusCode,
 		},
@@ -46,8 +69,24 @@ func main() {
 }
 
 func actionFunc(c *cli.Context) error {
-	if len(url) < 0 {
-		return cli.NewExitError("url length must be > 0 ", 1)
+	// Validate that either url or hostname is set
+	if len(url) < 0 && len(hostname) < 0 {
+		return cli.NewExitError("url or hostname length must be > 0 ", 1)
+	}
+
+	// Validate that either url or hostname is set, never both
+	if len(url) > 0 && len(hostname) > 0 {
+		return cli.NewExitError("specify url or hostname, not both ", 1)
+	}
+
+	// Validate valid port when hostname is set
+	if len(hostname) > 0 && port <= 0 {
+		return cli.NewExitError("hostname specified but port is invalid ", 1)
+	}
+
+	// Build a url if hostname is specified
+	if len(hostname) > 0 {
+		url = fmt.Sprintf("%s://%s:%d%s", schema, hostname, port, endpoint)
 	}
 
 	req, err := http.NewRequest(httpVerb, url, nil)
@@ -87,6 +126,10 @@ func actionFunc(c *cli.Context) error {
 // globals
 var (
 	url        string
+	hostname   string
+	port       int
+	schema     string
+	endpoint   string
 	httpVerb   string
 	statusCode int
 )
